@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>평촌드림교회 창립기념주일 사랑의 헌혈 신청</title>
+<style>
+  /* ── 리셋 & 기본 ── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 16px; }
+  body {
+    font-family: 'Noto Sans KR', sans-serif;
+    background: #f7f3f0;
+    color: #1a1a1a;
+    min-height: 100vh;
+  }
+
+  /* ── 레이아웃 ── */
+  .page { max-width: 560px; margin: 0 auto; padding: 2rem 1rem 4rem; }
+
+  /* ── 헤더 ── */
+  .header {
+    text-align: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1.75rem;
+    border-bottom: 1px solid #e8e0d8;
+  }
+  .cross-wrap {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: #fff0ee; margin: 0 auto 1rem;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .form-title { font-size: 20px; font-weight: 700; line-height: 1.45; margin-bottom: 10px; color: #1a1a1a; }
+  .form-desc { font-size: 13.5px; color: #666; line-height: 1.75; margin-bottom: 14px; }
+  .notice-box {
+    background: #fff8f7; border-left: 3px solid #c0392b;
+    border-radius: 0 8px 8px 0; padding: .8rem 1rem;
+    text-align: left; font-size: 13px; color: #555; line-height: 1.95;
+  }
+  .notice-box b { color: #c0392b; }
+
+  /* ── 카드 ── */
+  .card {
+    background: #fff; border-radius: 14px;
+    border: 1px solid #ede6de; padding: 1.5rem;
+    margin-bottom: 1.25rem;
+  }
+
+  /* ── 필드 ── */
+  .field { margin-bottom: 1.15rem; }
+  .field:last-child { margin-bottom: 0; }
+  .label {
+    font-size: 14px; font-weight: 600; color: #333;
+    margin-bottom: 7px; display: flex; align-items: center; gap: 4px;
+  }
+  .req { color: #c0392b; font-size: 13px; }
+  .input {
+    width: 100%; padding: 10px 13px;
+    border: 1.5px solid #ddd; border-radius: 9px;
+    font-size: 15px; color: #1a1a1a; background: #fff;
+    outline: none; font-family: inherit; transition: border-color .15s;
+  }
+  .input:focus { border-color: #c0392b; box-shadow: 0 0 0 3px rgba(192,57,43,.1); }
+  .input.err { border-color: #e74c3c; }
+  .err-msg { font-size: 12px; color: #c0392b; margin-top: 5px; }
+
+  /* ── 성별 버튼 ── */
+  .gender-row { display: flex; gap: 8px; }
+  .gender-btn {
+    flex: 1; padding: 10px; border-radius: 9px; font-size: 14px;
+    border: 1.5px solid #ddd; background: #fff; color: #888;
+    cursor: pointer; transition: all .15s; font-family: inherit; font-weight: 500;
+  }
+  .gender-btn.on { border-color: #c0392b; background: #fff0ee; color: #c0392b; }
+
+  /* ── 시간 슬롯 ── */
+  .section-label {
+    font-size: 14px; font-weight: 600; color: #333;
+    margin-bottom: 10px; display: flex; align-items: center; gap: 8px;
+  }
+  .selected-badge {
+    font-size: 12px; background: #fff0ee; color: #c0392b;
+    padding: 2px 9px; border-radius: 20px; font-weight: 500;
+  }
+  .slot-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .slot-btn {
+    padding: 11px 4px; border-radius: 9px; text-align: center;
+    border: 1.5px solid #ddd; background: #fff; cursor: pointer;
+    transition: all .15s;
+  }
+  .slot-btn:hover:not(.full):not(.on) { border-color: #c0392b; background: #fff8f7; }
+  .slot-btn.on { border-color: #c0392b; background: #fff0ee; }
+  .slot-btn.full { opacity: .42; cursor: not-allowed; background: #f8f5f2; }
+  .slot-time { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+  .slot-btn.on .slot-time { color: #c0392b; }
+  .slot-btn.full .slot-time { color: #aaa; }
+  .slot-remain { font-size: 11px; color: #999; margin-top: 3px; }
+  .slot-closed { font-size: 11px; color: #c0392b; font-weight: 600; margin-top: 3px; }
+
+  /* ── 체크박스 ── */
+  .chk-list { display: flex; flex-direction: column; gap: 11px; }
+  .chk-item { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+  .chk-item input[type=checkbox] {
+    width: 17px; height: 17px; accent-color: #c0392b;
+    cursor: pointer; flex-shrink: 0; margin-top: 2px;
+  }
+  .chk-item span { font-size: 14px; color: #555; line-height: 1.55; user-select: none; }
+
+  /* ── 제출 버튼 ── */
+  .submit-btn {
+    width: 100%; padding: 14px; background: #c0392b; color: #fff;
+    border: none; border-radius: 10px; font-size: 16px; font-weight: 700;
+    cursor: pointer; transition: background .15s; font-family: inherit;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .submit-btn:hover { background: #a93226; }
+  .submit-btn:disabled { background: #e8a09a; cursor: not-allowed; }
+
+  /* ── 완료 화면 ── */
+  .success-wrap {
+    text-align: center; padding: 2.5rem 1.5rem;
+    background: #fff; border-radius: 14px; border: 1px solid #ede6de;
+  }
+  .success-icon {
+    width: 60px; height: 60px; border-radius: 50%; background: #fff0ee;
+    margin: 0 auto 1.25rem;
+    display: flex; align-items: center; justify-content: center; font-size: 28px;
+  }
+  .success-title { font-size: 19px; font-weight: 700; margin-bottom: 10px; }
+  .success-desc { font-size: 14px; color: #666; line-height: 1.7; margin-bottom: 1.25rem; }
+  .receipt {
+    background: #f7f3f0; border-radius: 10px; padding: 1rem 1.25rem;
+    text-align: left; font-size: 13.5px; color: #555;
+    line-height: 2; margin-bottom: 1.5rem;
+  }
+  .receipt strong { color: #1a1a1a; }
+  .receipt .warn { color: #c0392b; font-weight: 600; }
+  .reset-btn {
+    padding: 11px 28px; background: #c0392b; color: #fff;
+    border: none; border-radius: 9px; font-size: 14px; font-weight: 700;
+    cursor: pointer; font-family: inherit;
+  }
+  .reset-btn:hover { background: #a93226; }
+
+  /* ── 로딩 오버레이 ── */
+  .loading-bar {
+    text-align: center; padding: 3rem; color: #aaa; font-size: 14px;
+  }
+
+  /* ── 에러 배너 ── */
+  .err-banner {
+    background: #fff0ee; border: 1px solid #f5b7b1; border-radius: 9px;
+    padding: 10px 14px; font-size: 13px; color: #c0392b; margin-bottom: 12px;
+  }
+
+  /* ── 구분선 ── */
+  .divider { height: 1px; background: #ede6de; margin: 1.5rem 0; }
+
+  /* ── 관리자 링크 ── */
+  .admin-link-wrap { text-align: center; margin-top: 1.75rem; }
+  .admin-link {
+    font-size: 12px; color: #ccc; background: none; border: none;
+    cursor: pointer; text-decoration: underline; font-family: inherit;
+  }
+
+  /* ── Firebase 설정 안내 배너 ── */
+  .setup-banner {
+    background: #fffbe6; border: 1px solid #f9c74f; border-radius: 10px;
+    padding: 1rem 1.25rem; font-size: 13px; color: #7a6000;
+    line-height: 1.8; margin-bottom: 1.25rem;
+  }
+  .setup-banner strong { color: #5a4400; }
+  .setup-banner code {
+    background: #fff3c4; padding: 1px 5px; border-radius: 4px;
+    font-family: monospace; font-size: 12px;
+  }
+
+  @media (max-width: 420px) {
+    .slot-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+    .slot-time { font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div id="app"><div class="loading-bar">불러오는 중...</div></div>
+</div>
+
+<!-- ════════════════════════════════════════════════
+     ★  FIREBASE 설정  ★
+     아래 firebaseConfig 값을 본인 프로젝트 값으로 교체하세요.
+     설정 방법은 파일 하단 주석을 참고하세요.
+════════════════════════════════════════════════ -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, push, onValue, update, remove }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+/* ─────────────────────────────────────────────
+   1) 여기에 본인 Firebase 프로젝트 설정을 붙여넣으세요
+   (Firebase Console → 프로젝트 설정 → 앱 → SDK 설정)
+───────────────────────────────────────────── */
+const firebaseConfig = {
+  apiKey:            "AIzaSyBpFEPL0IwuBzck9eOvinD5TjDMyjHNGF0",
+  authDomain:        "pcdcform1.firebaseapp.com",
+  databaseURL:       "https://pcdcform1-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId:         "pcdcform1",
+  storageBucket:     "pcdcform1.firebasestorage.app",
+  messagingSenderId: "955693703369",
+  appId:             "1:955693703369:web:7d110be6d3dfa78b6b6d18",
+  measurementId:     "G-SZ61VT73SS"
+};
+/* ───────────────────────────────────────────── */
+
+const CONFIGURED = !firebaseConfig.apiKey.startsWith("YOUR");
+const MAX_DEFAULT = 3;
+const MAX_40 = 4;
+const ADMIN_PW = "dream2025";
+const SKIP_SLOTS = ["11:20","11:40","12:00"];
+const SLOTS = (()=>{
+  const s=[]; let h=8,m=40;
+  while(true){
+    const label=`${String(h).padStart(2,"0")}:${String(m).padStart(2,"0")}`;
+    if(!SKIP_SLOTS.includes(label)) s.push(label);
+    m+=20; if(m>=60){h++;m-=60;}
+    if(h>15||(h===15&&m>40)) break;
+  }
+  return s;
+})();
+function slotMax(s){ return s.endsWith(":40") ? MAX_40 : MAX_DEFAULT; }
+const CHECKS = [
+  "예약 시간 10분 전까지 도착하겠습니다.",
+  "신분증을 지참하겠습니다.",
+  "당일 식사 후 참여하겠습니다.",
+  "건강 상태에 따라 현장에서 헌혈이 제한될 수 있음을 확인했습니다."
+];
+
+let db, entriesRef;
+let entries = {};   // { fbKey: entryObj }
+let view = "form";
+let saving = false;
+let submitted = null;
+let form = { name:"", phone:"", gender:"", birth:"", slot:"", checks:[false,false,false,false] };
+let errors = {};
+let adminPw = "";
+let adminErr = "";
+let filter = { slot:"전체", status:"전체", search:"" };
+
+function fmt(v){
+  v=v.replace(/\D/g,"");
+  if(v.length<=3)return v;
+  if(v.length<=7)return v.slice(0,3)+"-"+v.slice(3);
+  return v.slice(0,3)+"-"+v.slice(3,7)+"-"+v.slice(7,11);
+}
+
+function slotCount(s){
+  return Object.values(entries).filter(e=>e.slot===s&&e.status!=="취소").length;
+}
+function isFull(s){ return slotCount(s)>=slotMax(s); }
+
+/* ── 렌더 ── */
+function render(){
+  const app = document.getElementById("app");
+  if(!CONFIGURED){
+    app.innerHTML = renderSetupGuide();
+    return;
+  }
+  if(view==="form")   app.innerHTML = renderForm();
+  if(view==="success")app.innerHTML = renderSuccess();
+  if(view==="admin")  app.innerHTML = renderAdmin();
+  bindEvents();
+}
+
+function renderSetupGuide(){
+  return `
+<div class="setup-banner">
+  <strong>⚙️ Firebase 연결 설정이 필요합니다</strong><br><br>
+  이 파일을 실제로 사용하려면 Firebase 프로젝트를 연결해야 합니다.<br>
+  <strong>1단계</strong> — <a href="https://console.firebase.google.com" target="_blank" style="color:#7a6000;">console.firebase.google.com</a> 접속 → 새 프로젝트 생성<br>
+  <strong>2단계</strong> — Realtime Database 활성화 (테스트 모드로 시작)<br>
+  <strong>3단계</strong> — 프로젝트 설정 → 앱 추가(웹) → SDK 설정 복사<br>
+  <strong>4단계</strong> — 이 파일의 <code>firebaseConfig</code> 부분에 붙여넣기<br><br>
+  설정 완료 후 파일을 저장하면 바로 사용 가능합니다.
+</div>
+<div class="card" style="text-align:center;color:#aaa;font-size:14px;padding:2rem;">
+  Firebase 설정 후 이 화면이 신청 폼으로 바뀝니다.
+</div>`;
+}
+
+function renderForm(){
+  const e = errors;
+  const slotBtns = SLOTS.map(s=>{
+    const cnt = slotCount(s);
+    const full = isFull(s);
+    const on = form.slot===s;
+    return `<button class="slot-btn${full?" full":""}${on?" on":""}"
+      data-slot="${s}" ${full?"disabled":""}>
+      <div class="slot-time">${s}</div>
+      ${full
+        ? `<div class="slot-closed">마감</div>`
+        : `<div class="slot-remain">잔여 ${slotMax(s)-cnt}명</div>`}
+    </button>`;
+  }).join("");
+
+  const chkItems = CHECKS.map((t,i)=>`
+    <label class="chk-item">
+      <input type="checkbox" data-chk="${i}" ${form.checks[i]?"checked":""}/>
+      <span>${t}</span>
+    </label>`).join("");
+
+  return `
+<div class="header">
+  <div class="cross-wrap">
+    <svg width="26" height="26" viewBox="0 0 28 28" fill="none">
+      <rect x="11" y="3" width="6" height="22" rx="2" fill="#c0392b"/>
+      <rect x="3" y="11" width="22" height="6" rx="2" fill="#c0392b"/>
+    </svg>
+  </div>
+  <div class="form-title">평촌드림교회 창립기념주일<br>사랑의 헌혈 신청</div>
+  <div class="form-desc">창립기념주일을 맞아 사랑의 헌혈 봉사를 진행합니다.<br>헌혈 차량이 교회로 방문하며, 원활한 진행을 위해 사전 예약제로 운영합니다.</div>
+  <div class="notice-box">
+    <b>※</b> 신분증 필수 지참<br>
+    <b>※</b> 당일 식사 후 참여 권장<br>
+    <b>※</b> 수면 부족·음주·건강 상태에 따라 헌혈 제한 가능<br>
+    <b>※</b> 예약 시간 10분 전 도착 부탁드립니다.
+  </div>
+</div>
+
+<div class="card">
+  <div class="field">
+    <div class="label">이름 <span class="req">*</span></div>
+    <input id="f-name" class="input${e.name?" err":""}" value="${form.name}" placeholder="성함을 입력해 주세요" maxlength="20"/>
+    ${e.name?`<div class="err-msg">${e.name}</div>`:""}
+  </div>
+  <div class="field">
+    <div class="label">연락처 <span class="req">*</span></div>
+    <input id="f-phone" class="input${e.phone?" err":""}" value="${form.phone}" placeholder="010-0000-0000" type="tel"/>
+    ${e.phone?`<div class="err-msg">${e.phone}</div>`:""}
+  </div>
+  <div class="field">
+    <div class="label">성별</div>
+    <div class="gender-row">
+      <button class="gender-btn${form.gender==="남성"?" on":""}" id="g-m">남성</button>
+      <button class="gender-btn${form.gender==="여성"?" on":""}" id="g-f">여성</button>
+    </div>
+  </div>
+  <div class="field">
+    <div class="label">생년월일</div>
+    <input id="f-birth" class="input" type="date" value="${form.birth}"/>
+  </div>
+</div>
+
+<div class="card">
+  <div class="section-label">
+    헌혈 예약 시간 <span class="req">*</span>
+    ${form.slot?`<span class="selected-badge">${form.slot} 선택됨</span>`:""}
+  </div>
+  <div class="slot-grid">${slotBtns}</div>
+  ${e.slot?`<div class="err-msg" style="margin-top:7px;">${e.slot}</div>`:""}
+</div>
+
+<div class="card">
+  <div class="section-label" style="margin-bottom:12px;">안내사항 확인 <span class="req">*</span></div>
+  <div class="chk-list">${chkItems}</div>
+  ${e.checks?`<div class="err-msg" style="margin-top:8px;">${e.checks}</div>`:""}
+</div>
+
+${e.submit?`<div class="err-banner">${e.submit}</div>`:""}
+
+<button class="submit-btn" id="btn-submit" ${saving?"disabled":""}>
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+  ${saving?"저장 중...":"헌혈 신청하기"}
+</button>
+
+<div class="admin-link-wrap">
+  <button class="admin-link" id="go-admin">관리자 페이지</button>
+</div>`;
+}
+
+function renderSuccess(){
+  const e = submitted;
+  return `
+<div class="success-wrap">
+  <div class="success-icon">✅</div>
+  <div class="success-title">헌혈 신청이 완료되었습니다.</div>
+  <div class="success-desc">사랑의 헌혈 봉사에 함께해 주셔서 감사합니다.</div>
+  ${e?`<div class="receipt">
+    <strong>예약자</strong>: ${e.name}<br>
+    <strong>연락처</strong>: ${e.phone}<br>
+    <strong>예약 시간</strong>: ${e.slot}<br><br>
+    <span class="warn">※ 예약 시간 10분 전 도착 &nbsp; ※ 신분증 필수 지참</span>
+  </div>`:""}
+  <button class="reset-btn" id="btn-reset">처음으로</button>
+</div>`;
+}
+
+function renderAdmin(){
+  const list = Object.entries(entries);
+  const active = list.filter(([,e])=>e.status!=="취소").length;
+  const attend = list.filter(([,e])=>e.status==="출석").length;
+  const cancel = list.filter(([,e])=>e.status==="취소").length;
+  const remain = SLOTS.reduce((a,s)=>a+slotMax(s),0) - active;
+
+  let filtered = list.filter(([,e])=>{
+    if(filter.slot!=="전체"&&e.slot!==filter.slot) return false;
+    if(filter.status!=="전체"&&e.status!==filter.status) return false;
+    if(filter.search&&!e.name.includes(filter.search)&&!e.phone.includes(filter.search)) return false;
+    return true;
+  });
+
+  const badgeColor = { "예약":"#0C447C", "출석":"#085041", "미참":"#A32D2D", "취소":"#444441" };
+  const badgeBg   = { "예약":"#E6F1FB", "출석":"#E1F5EE", "미참":"#FCEBEB", "취소":"#F1EFE8" };
+
+  const rows = filtered.map(([key,e])=>`
+    <tr>
+      <td style="font-weight:600;">${e.name}</td>
+      <td style="color:#666;">${e.phone}</td>
+      <td style="color:#666;">${e.gender||"-"}</td>
+      <td style="color:#666;">${e.birth||"-"}</td>
+      <td style="font-family:monospace;font-weight:600;">${e.slot}</td>
+      <td style="font-size:12px;color:#aaa;">${e.createdAt||""}</td>
+      <td>
+        <select class="status-sel" data-key="${key}"
+          style="border:1px solid #ddd;border-radius:6px;padding:3px 6px;font-size:12px;cursor:pointer;font-family:inherit;">
+          ${["예약","출석","미참","취소"].map(s=>`<option${e.status===s?" selected":""}>${s}</option>`).join("")}
+        </select>
+      </td>
+      <td>
+        <button class="del-btn" data-key="${key}"
+          style="background:none;border:none;cursor:pointer;color:#ccc;font-size:16px;padding:2px;">✕</button>
+      </td>
+    </tr>`).join("");
+
+  const slotCells = SLOTS.map(s=>{
+    const cnt=slotCount(s); const full=cnt>=slotMax(s);
+    return `<div style="text-align:center;padding:7px 4px;border:1px solid ${full?"#f5b7b1":"#e8e0d8"};border-radius:8px;background:${full?"#fff0ee":cnt>0?"#e8f3fb":"#fafafa"};">
+      <div style="font-size:13px;font-weight:600;color:${full?"#c0392b":cnt>0?"#1a5c8a":"#bbb"};">${s}</div>
+      <div style="font-size:11px;color:${full?"#c0392b":"#aaa"};margin-top:2px;">${full?"마감":`${cnt}/${slotMax(s)}`}</div>
+    </div>`;
+  }).join("");
+
+  return `
+<div style="padding-bottom:2rem;">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:1.5rem;">
+    <div>
+      <div style="font-size:17px;font-weight:700;">관리자 대시보드</div>
+      <div style="font-size:13px;color:#888;margin-top:2px;">평촌드림교회 창립기념주일 헌혈 현황</div>
+    </div>
+    <div style="display:flex;gap:7px;flex-wrap:wrap;">
+      <button onclick="location.reload()" style="padding:7px 12px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;font-family:inherit;">새로고침</button>
+      <button id="btn-excel" style="padding:7px 12px;border:1px solid #1d6f42;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;font-family:inherit;color:#1d6f42;font-weight:500;">⬇ 엑셀 다운로드</button>
+      <button id="btn-gsheet" style="padding:7px 12px;border:1px solid #4285f4;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;font-family:inherit;color:#4285f4;font-weight:500;">구글 시트로 보내기</button>
+      <button id="go-form" style="padding:7px 12px;border:1px solid #ddd;border-radius:8px;background:#fff;font-size:13px;cursor:pointer;font-family:inherit;">신청 폼 보기</button>
+      <button id="go-logout" style="padding:7px 12px;border:1px solid #ddd;border-radius:8px;background:#f5f5f5;font-size:13px;cursor:pointer;color:#999;font-family:inherit;">로그아웃</button>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:1.25rem;">
+    <div style="background:#E6F1FB;border-radius:9px;padding:10px 13px;"><div style="font-size:12px;color:#185FA5;margin-bottom:3px;">총 신청</div><div style="font-size:24px;font-weight:700;color:#0C447C;">${active}</div></div>
+    <div style="background:#E1F5EE;border-radius:9px;padding:10px 13px;"><div style="font-size:12px;color:#0F6E56;margin-bottom:3px;">출석</div><div style="font-size:24px;font-weight:700;color:#085041;">${attend}</div></div>
+    <div style="background:#FCEBEB;border-radius:9px;padding:10px 13px;"><div style="font-size:12px;color:#A32D2D;margin-bottom:3px;">취소</div><div style="font-size:24px;font-weight:700;color:#791F1F;">${cancel}</div></div>
+    <div style="background:#FAEEDA;border-radius:9px;padding:10px 13px;"><div style="font-size:12px;color:#854F0B;margin-bottom:3px;">남은 자리</div><div style="font-size:24px;font-weight:700;color:#633806;">${remain}</div></div>
+  </div>
+
+  <div class="card" style="margin-bottom:1.25rem;">
+    <div style="font-size:13px;font-weight:600;margin-bottom:10px;">시간대별 예약 현황</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:6px;">${slotCells}</div>
+  </div>
+
+  <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px;">
+    <input id="a-search" value="${filter.search}" placeholder="이름 / 연락처"
+      style="padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;width:140px;font-family:inherit;"/>
+    <select id="a-slot" style="padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;">
+      <option${filter.slot==="전체"?" selected":""}>전체</option>
+      ${SLOTS.map(s=>`<option${filter.slot===s?" selected":""}>${s}</option>`).join("")}
+    </select>
+    <select id="a-status" style="padding:7px 10px;border:1px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;">
+      ${["전체","예약","출석","미참","취소"].map(s=>`<option${filter.status===s?" selected":""}>${s}</option>`).join("")}
+    </select>
+  </div>
+
+  <div class="card" style="padding:0;overflow:hidden;">
+    ${filtered.length===0
+      ?`<div style="text-align:center;padding:2.5rem;color:#bbb;font-size:14px;">신청자가 없습니다.</div>`
+      :`<div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead style="background:#f7f3f0;">
+            <tr style="border-bottom:1px solid #ede6de;">
+              <th style="padding:9px 11px;text-align:left;font-weight:600;color:#888;white-space:nowrap;">이름</th>
+              <th style="padding:9px 11px;text-align:left;font-weight:600;color:#888;">연락처</th>
+              <th style="padding:9px 11px;text-align:left;font-weight:600;color:#888;">성별</th>
+              <th style="padding:9px 11px;text-align:left;font-weight:600;color:#888;white-space:nowrap;">생년월일</th>
+              <th style="padding:9px 11px;text-align:left;font-weight:600;color:#888;">예약시간</th>
+              <th style="padding:9px 11px;text-align:left;font-weight:600;color:#888;white-space:nowrap;">신청일시</th>
+              <th style="padding:9px 11px;text-align:left;font-weight:600;color:#888;">상태</th>
+              <th style="padding:9px 11px;"></th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>`}
+  </div>
+  <div style="font-size:12px;color:#bbb;margin-top:7px;text-align:right;">총 ${filtered.length}건</div>
+  <div id="gsheet-setup" style="display:none;background:#f0f7ff;border:1px solid #b3d4fb;border-radius:10px;padding:1rem 1.25rem;margin-top:12px;font-size:13px;color:#1a3a6b;line-height:1.9;">
+    <strong style="color:#1a3a6b;">구글 시트 연동 설정 방법</strong><br>
+    1. <a href="https://script.google.com" target="_blank" style="color:#4285f4;">script.google.com</a> 접속 → 새 프로젝트<br>
+    2. 아래 코드 붙여넣기 후 저장 → 배포 → 웹 앱으로 배포 → 액세스: <strong>모든 사용자</strong><br>
+    3. 배포 URL 복사 → 아래 입력창에 붙여넣기
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap;">
+      <input id="gsheet-url" placeholder="https://script.google.com/macros/s/..." 
+        style="flex:1;min-width:200px;padding:8px 10px;border:1px solid #b3d4fb;border-radius:8px;font-size:13px;font-family:inherit;"/>
+      <button id="btn-gsheet-send" style="padding:8px 14px;background:#4285f4;color:#fff;border:none;border-radius:8px;font-size:13px;cursor:pointer;font-family:inherit;font-weight:500;">전송</button>
+    </div>
+    <details style="margin-top:12px;">
+      <summary style="cursor:pointer;font-size:12px;color:#4285f4;">Apps Script 코드 보기 (클릭)</summary>
+      <pre id="apps-script-code" style="margin-top:8px;background:#fff;border:1px solid #b3d4fb;border-radius:8px;padding:10px;font-size:11px;overflow-x:auto;line-height:1.7;color:#1a1a1a;">function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = JSON.parse(e.postData.contents);
+  
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['신청일시','이름','연락처','성별','생년월일','예약시간','상태']);
+  }
+  data.forEach(function(row) {
+    sheet.appendRow([row.createdAt, row.name, row.phone,
+      row.gender, row.birth, row.slot, row.status]);
+  });
+  
+  return ContentService
+    .createTextOutput(JSON.stringify({result:'success'}))
+    .setMimeType(ContentService.MimeType.JSON);
+}</pre>
+      <button onclick="navigator.clipboard.writeText(document.getElementById('apps-script-code').innerText)" 
+        style="margin-top:6px;padding:5px 12px;border:1px solid #b3d4fb;border-radius:6px;background:#fff;font-size:12px;cursor:pointer;color:#4285f4;font-family:inherit;">코드 복사</button>
+    </details>
+  </div>
+</div>
+
+<!-- 관리자 로그인 모달 (숨김 상태) -->
+<div id="login-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:14px;padding:2rem 1.75rem;width:300px;text-align:center;">
+    <div style="font-size:22px;margin-bottom:8px;">🔐</div>
+    <div style="font-size:16px;font-weight:700;margin-bottom:4px;">관리자 로그인</div>
+    <div style="font-size:13px;color:#888;margin-bottom:1rem;">비밀번호를 입력해 주세요</div>
+    <input id="modal-pw" type="password" class="input" placeholder="비밀번호" style="margin-bottom:8px;"/>
+    <div id="modal-err" style="font-size:12px;color:#c0392b;margin-bottom:8px;display:none;"></div>
+    <button id="modal-login" class="submit-btn" style="font-size:14px;padding:11px;">로그인</button>
+    <button id="modal-cancel" style="margin-top:8px;width:100%;padding:9px;background:#f5f5f5;border:none;border-radius:9px;font-size:13px;cursor:pointer;color:#888;font-family:inherit;">취소</button>
+  </div>
+</div>`;
+}
+
+/* ── 이벤트 바인딩 ── */
+function bindEvents(){
+  const $ = id => document.getElementById(id);
+
+  if(view==="form"){
+    $("f-name").oninput = e => { form.name=e.target.value; delete errors.name; };
+    $("f-phone").oninput = e => { const v=fmt(e.target.value); form.phone=v; e.target.value=v; delete errors.phone; };
+    $("f-birth").oninput = e => { form.birth=e.target.value; };
+    $("g-m").onclick = ()=>{ form.gender="남성"; render(); };
+    $("g-f").onclick = ()=>{ form.gender="여성"; render(); };
+    document.querySelectorAll(".slot-btn:not(.full)").forEach(b=>{
+      b.onclick = ()=>{ form.slot=b.dataset.slot; delete errors.slot; render(); };
+    });
+    document.querySelectorAll("[data-chk]").forEach(c=>{
+      c.onchange = ()=>{
+        form.checks[+c.dataset.chk]=c.checked;
+        if(form.checks.every(Boolean)) delete errors.checks;
+      };
+    });
+    $("btn-submit").onclick = handleSubmit;
+    $("go-admin").onclick = ()=>{ showLoginModal(); };
+  }
+
+  if(view==="success"){
+    $("btn-reset").onclick = ()=>{
+      form={name:"",phone:"",gender:"",birth:"",slot:"",checks:[false,false,false,false]};
+      errors={}; submitted=null; view="form"; render();
+    };
+  }
+
+  if(view==="admin"){
+    $("go-form").onclick  = ()=>{ view="form"; render(); };
+    $("go-logout").onclick = ()=>{ view="form"; render(); };
+    $("a-search").oninput  = e=>{ filter.search=e.target.value; render(); };
+
+    $("btn-excel").onclick = ()=>{ downloadExcel(); };
+    $("btn-gsheet").onclick = ()=>{
+      const panel = $("gsheet-setup");
+      panel.style.display = panel.style.display==="none" ? "block" : "none";
+    };
+    const sendBtn = $("btn-gsheet-send");
+    if(sendBtn) sendBtn.onclick = ()=>{ sendToGsheet(); };
+    $("a-slot").onchange   = e=>{ filter.slot=e.target.value; render(); };
+    $("a-status").onchange = e=>{ filter.status=e.target.value; render(); };
+    document.querySelectorAll(".status-sel").forEach(s=>{
+      s.onchange = ()=>{
+        update(ref(db,`entries/${s.dataset.key}`),{status:s.value});
+      };
+    });
+    document.querySelectorAll(".del-btn").forEach(b=>{
+      b.onclick = ()=>{
+        if(!confirm("삭제하시겠습니까?")) return;
+        remove(ref(db,`entries/${b.dataset.key}`));
+      };
+    });
+
+    // 로그인 모달
+    const modal = $("login-modal");
+    if(modal){
+      modal.onclick = e=>{ if(e.target===modal) modal.style.display="none"; };
+      $("modal-cancel").onclick = ()=>{ modal.style.display="none"; };
+      $("modal-login").onclick  = doModalLogin;
+      $("modal-pw").onkeydown   = e=>{ if(e.key==="Enter") doModalLogin(); };
+    }
+  }
+}
+
+
+/* ── 엑셀 다운로드 ── */
+function downloadExcel(){
+  const list = Object.values(entries);
+  if(!list.length){ alert("다운로드할 데이터가 없습니다."); return; }
+  const BOM = "\uFEFF";
+  const headers = ["신청일시","이름","연락처","성별","생년월일","예약시간","상태"];
+  const rows = list.map(e=>[
+    e.createdAt||"", e.name||"", e.phone||"",
+    e.gender||"", e.birth||"", e.slot||"", e.status||""
+  ]);
+  const csv = BOM + [headers, ...rows]
+    .map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(","))
+    .join("\n");
+  const blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "헌혈신청명단.csv";
+  a.click(); URL.revokeObjectURL(url);
+}
+
+/* ── 구글 시트 전송 ── */
+async function sendToGsheet(){
+  const url = document.getElementById("gsheet-url").value.trim();
+  if(!url){ alert("Apps Script 배포 URL을 입력해 주세요."); return; }
+  const list = Object.values(entries);
+  if(!list.length){ alert("전송할 데이터가 없습니다."); return; }
+  const btn = document.getElementById("btn-gsheet-send");
+  btn.textContent="전송 중..."; btn.disabled=true;
+  try{
+    await fetch(url, {
+      method:"POST", mode:"no-cors",
+      headers:{"Content-Type":"application/json"},
+      body: JSON.stringify(list)
+    });
+    alert("구글 시트로 전송했습니다.\n시트를 열어 확인해 주세요.");
+  }catch(err){
+    alert("전송 중 오류가 발생했습니다. URL을 확인해 주세요.");
+  }
+  btn.textContent="전송"; btn.disabled=false;
+}
+
+function showLoginModal(){
+  view="admin"; render();
+  const modal = document.getElementById("login-modal");
+  if(modal){ modal.style.display="flex"; }
+}
+
+function doModalLogin(){
+  const pw = document.getElementById("modal-pw").value;
+  const errEl = document.getElementById("modal-err");
+  if(pw===ADMIN_PW){
+    document.getElementById("login-modal").style.display="none";
+    view="admin"; render();
+  } else {
+    errEl.textContent="비밀번호가 올바르지 않습니다.";
+    errEl.style.display="block";
+  }
+}
+
+async function handleSubmit(){
+  const errs={};
+  if(!form.name.trim()) errs.name="이름을 입력해 주세요.";
+  if(!form.phone||form.phone.replace(/\D/g,"").length<10) errs.phone="연락처를 입력해 주세요.";
+  if(!form.slot) errs.slot="예약 시간을 선택해 주세요.";
+  if(form.checks.some(c=>!c)) errs.checks="모든 안내사항을 확인해 주세요.";
+  if(Object.keys(errs).length){ errors=errs; render(); return; }
+
+  const dup = Object.values(entries).some(e=>e.phone===form.phone&&e.status!=="취소");
+  if(dup){ errors={phone:"이미 신청하신 연락처입니다."}; render(); return; }
+
+  saving=true; render();
+  const entry={
+    name:form.name.trim(), phone:form.phone,
+    gender:form.gender||"미입력", birth:form.birth||"미입력",
+    slot:form.slot, status:"예약",
+    createdAt:new Date().toLocaleString("ko-KR")
+  };
+  try{
+    await push(entriesRef, entry);
+    submitted=entry; view="success";
+  }catch(err){
+    errors={submit:"저장 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."};
+  }
+  saving=false; render();
+}
+
+/* ── Firebase 초기화 & 실시간 리스너 ── */
+if(CONFIGURED){
+  const app = initializeApp(firebaseConfig);
+  db = getDatabase(app);
+  entriesRef = ref(db,"entries");
+  onValue(entriesRef, snapshot=>{
+    entries = snapshot.val() || {};
+    render();
+  });
+} else {
+  render();
+}
+</script>
+
+<!--
+════════════════════════════════════════════════════════════
+  Firebase 무료 설정 방법 (5분 완성)
+════════════════════════════════════════════════════════════
+
+1. https://console.firebase.google.com 접속 (구글 계정 로그인)
+2. "프로젝트 만들기" → 이름 입력 → 생성
+3. 왼쪽 메뉴 "빌드" → "Realtime Database" → "데이터베이스 만들기"
+   → 위치: asia-southeast1 선택 → "테스트 모드"로 시작
+4. 프로젝트 개요(홈) → 앱 추가(</> 아이콘) → 웹 앱 등록
+5. "SDK 설정 및 구성" 에서 firebaseConfig 객체 복사
+6. 이 파일 상단 firebaseConfig 부분에 붙여넣기 후 저장
+
+════ 배포(무료 링크 생성) 방법 ════
+
+방법 A — Netlify Drop (가장 쉬움, 1분)
+  1. https://app.netlify.com/drop 접속
+  2. 이 HTML 파일을 드래그 앤 드롭
+  3. 자동 생성된 링크(예: amazing-cake-abc123.netlify.app) 공유!
+
+방법 B — GitHub Pages (무료, 안정적)
+  1. github.com → 새 저장소 생성 (Public)
+  2. 이 파일을 index.html 로 업로드
+  3. Settings → Pages → Branch: main 선택 → Save
+  4. https://[아이디].github.io/[저장소명] 링크 공유!
+
+방법 C — Google Sites 임베드
+  1. sites.google.com → 새 사이트 → 삽입 → 삽입 코드
+  2. <iframe src="netlify/github 링크" width="100%" height="800"></iframe>
+  3. 교회 구글 계정으로 관리 가능
+
+════════════════════════════════════════════════════════════
+-->
+</body>
+</html>
