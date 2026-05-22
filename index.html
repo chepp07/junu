@@ -194,7 +194,7 @@
 ════════════════════════════════════════════════ -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, push, onValue, update, remove }
+import { getDatabase, ref, push, onValue, update, remove, runTransaction, get }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 /* ─────────────────────────────────────────────
@@ -211,6 +211,7 @@ const firebaseConfig = {
   appId:             "1:955693703369:web:7d110be6d3dfa78b6b6d18",
   measurementId:     "G-SZ61VT73SS"
 };
+
 /* ───────────────────────────────────────────── */
 
 const CONFIGURED = !firebaseConfig.apiKey.startsWith("YOUR");
@@ -729,19 +730,46 @@ async function handleSubmit(){
   if(form.checks.some(c=>!c)) errs.checks="모든 안내사항을 확인해 주세요.";
   if(Object.keys(errs).length){ errors=errs; render(); return; }
 
-  const dup = Object.values(entries).some(e=>e.phone===form.phone&&e.status!=="취소");
-  if(dup){ errors={phone:"이미 신청하신 연락처입니다."}; render(); return; }
-
   saving=true; render();
-  const entry={
-    name:form.name.trim(), phone:form.phone,
-    gender:form.gender||"미입력", birth:form.birth||"미입력",
-    slot:form.slot, status:"예약",
-    createdAt:new Date().toLocaleString("ko-KR")
-  };
+
   try{
+    /* ── 1단계: 중복 신청 확인 (최신 DB 값 직접 읽기) ── */
+    const snap = await get(entriesRef);
+    const current = snap.val() || {};
+    const dup = Object.values(current).some(e=>e.phone===form.phone&&e.status!=="취소");
+    if(dup){
+      errors={phone:"이미 신청하신 연락처입니다."};
+      saving=false; render(); return;
+    }
+
+    /* ── 2단계: 슬롯 인원을 Transaction으로 원자적 처리 ── */
+    const slotCountRef = ref(db, "slotCounts/" + form.slot.replace(":",""));
+    const maxCount = slotMax(form.slot);
+
+    const txResult = await runTransaction(slotCountRef, (currentCount)=>{
+      const cnt = currentCount || 0;
+      if(cnt >= maxCount){
+        return; // undefined 반환 → 트랜잭션 중단 (정원 초과)
+      }
+      return cnt + 1; // 정원 미만 → 1 증가
+    });
+
+    if(!txResult.committed){
+      /* 정원 초과 — 다른 사용자가 동시에 신청해서 마감됨 */
+      errors={slot:"방금 해당 시간대 정원이 마감되었습니다. 다른 시간을 선택해 주세요."};
+      saving=false; render(); return;
+    }
+
+    /* ── 3단계: Transaction 성공 시에만 신청 데이터 저장 ── */
+    const entry={
+      name:form.name.trim(), phone:form.phone,
+      gender:form.gender||"미입력", birth:form.birth||"미입력",
+      slot:form.slot, status:"예약",
+      createdAt:new Date().toLocaleString("ko-KR")
+    };
     await push(entriesRef, entry);
     submitted=entry; view="success";
+
   }catch(err){
     errors={submit:"저장 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."};
   }
@@ -755,6 +783,25 @@ if(CONFIGURED){
   entriesRef = ref(db,"entries");
   onValue(entriesRef, snapshot=>{
     entries = snapshot.val() || {};
+    render();
+  });
+
+  /* slotCounts 실시간 반영 — Transaction 결과를 UI에 즉시 동기화 */
+  const slotCountsRef = ref(db, "slotCounts");
+  onValue(slotCountsRef, snapshot=>{
+    const counts = snapshot.val() || {};
+    /* entries 기반 카운트를 slotCounts로 보정 */
+    ALL_SLOTS.forEach(s=>{
+      const key = s.replace(":","");
+      if(counts[key] !== undefined){
+        /* DB의 Transaction 카운터를 우선 신뢰 */
+        const fromEntries = Object.values(entries).filter(e=>e.slot===s&&e.status!=="취소").length;
+        if(counts[key] > fromEntries){
+          /* 동시 신청으로 slotCounts가 앞서간 경우 UI를 즉시 마감 처리 */
+          entries["__lock_"+key] = {slot:s, status:"예약", phone:"__lock__"};
+        }
+      }
+    });
     render();
   });
 } else {
