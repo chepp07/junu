@@ -194,22 +194,22 @@
 ════════════════════════════════════════════════ -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-import { getDatabase, ref, push, onValue, update, remove, runTransaction, get }
+import { getDatabase, ref, push, onValue, update, remove, runTransaction }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 /* ─────────────────────────────────────────────
    1) 여기에 본인 Firebase 프로젝트 설정을 붙여넣으세요
    (Firebase Console → 프로젝트 설정 → 앱 → SDK 설정)
 ───────────────────────────────────────────── */
-const firebaseConfig = {
-  apiKey:            "AIzaSyBpFEPL0IwuBzck9eOvinD5TjDMyjHNGF0",
-  authDomain:        "pcdcform1.firebaseapp.com",
-  databaseURL:       "https://pcdcform1-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId:         "pcdcform1",
-  storageBucket:     "pcdcform1.firebasestorage.app",
+cconst firebaseConfig = {
+  apiKey: "AIzaSyBpFEPL0IwuBzck9eOvinD5TjDMyjHNGF0",
+  authDomain: "pcdcform1.firebaseapp.com",
+  databaseURL: "https://pcdcform1-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "pcdcform1",
+  storageBucket: "pcdcform1.firebasestorage.app",
   messagingSenderId: "955693703369",
-  appId:             "1:955693703369:web:7d110be6d3dfa78b6b6d18",
-  measurementId:     "G-SZ61VT73SS"
+  appId: "1:955693703369:web:7d110be6d3dfa78b6b6d18",
+  measurementId: "G-SZ61VT73SS"
 };
 /* ───────────────────────────────────────────── */
 
@@ -236,7 +236,7 @@ const CHECKS = [
   "건강 상태에 따라 현장에서 헌혈이 제한될 수 있음을 확인했습니다."
 ];
 
-let db, entriesRef;
+let db, entriesRef, slotsRef;
 let entries = {};   // { fbKey: entryObj }
 let view = "form";
 let saving = false;
@@ -254,7 +254,12 @@ function fmt(v){
   return v.slice(0,3)+"-"+v.slice(3,7)+"-"+v.slice(7,11);
 }
 
+let slotsCache = {};  // { "0840": { count:2, entries:{...} } }
+
 function slotCount(s){
+  const key = s.replace(":","");
+  // slotsCache 우선, 없으면 entries fallback
+  if(slotsCache[key] !== undefined) return slotsCache[key].count || 0;
   return Object.values(entries).filter(e=>e.slot===s&&e.status!=="취소").length;
 }
 function isFull(s){ return slotCount(s)>=slotMax(s); }
@@ -596,37 +601,37 @@ function bindEvents(){
     $("a-status").onchange = e=>{ filter.status=e.target.value; render(); };
     document.querySelectorAll(".status-sel").forEach(s=>{
       s.onchange = async ()=>{
-        const key = s.dataset.key;
-        const entry = entries[key];
-        const newStatus = s.value;
-        const oldStatus = entry.status;
+        const fbKey    = s.dataset.key;
+        const entry    = entries[fbKey];
+        const newStatus= s.value;
+        if(!entry) return;
+        const slotKey  = entry.slot.replace(":","");
 
-        await update(ref(db,`entries/${key}`),{status:newStatus});
-
-        const slotKey = entry.slot.replace(":","");
-        const slotRef = ref(db,"slotCounts/"+slotKey);
-
-        // 취소 아닌 상태 → 취소: 카운터 -1
-        if(oldStatus !== "취소" && newStatus === "취소"){
-          await runTransaction(slotRef, cnt => Math.max(0,(cnt||0)-1));
-        }
-        // 취소 → 취소 아닌 상태(복구): 카운터 +1
-        if(oldStatus === "취소" && newStatus !== "취소"){
-          await runTransaction(slotRef, cnt => (cnt||0)+1);
-        }
+        await runTransaction(ref(db,"slots/"+slotKey), (slotData)=>{
+          if(!slotData) return slotData;
+          const ents = slotData.entries || {};
+          if(!ents[fbKey]) return slotData;
+          ents[fbKey] = { ...ents[fbKey], status: newStatus };
+          const active = Object.values(ents).filter(e=>e.status!=="취소").length;
+          return { ...slotData, entries: ents, count: active };
+        });
       };
     });
     document.querySelectorAll(".del-btn").forEach(b=>{
       b.onclick = async ()=>{
         if(!confirm("삭제하시겠습니까?")) return;
-        const key = b.dataset.key;
-        const entry = entries[key];
-        await remove(ref(db,`entries/${key}`));
-        // 취소가 아닌 신청 삭제 시 슬롯 카운터 -1
-        if(entry && entry.status !== "취소"){
-          const slotKey = entry.slot.replace(":","");
-          await runTransaction(ref(db,"slotCounts/"+slotKey), cnt => Math.max(0,(cnt||0)-1));
-        }
+        const fbKey   = b.dataset.key;
+        const entry   = entries[fbKey];
+        if(!entry) return;
+        const slotKey = entry.slot.replace(":","");
+
+        await runTransaction(ref(db,"slots/"+slotKey), (slotData)=>{
+          if(!slotData) return slotData;
+          const ents = { ...(slotData.entries||{}) };
+          delete ents[fbKey];
+          const active = Object.values(ents).filter(e=>e.status!=="취소").length;
+          return { ...slotData, entries: ents, count: active };
+        });
       };
     });
 
@@ -756,52 +761,60 @@ async function handleSubmit(){
   saving=true; render();
 
   try{
-    /* ── 1단계: 중복 신청 확인 (최신 DB 값 직접 읽기) ── */
-    const snap = await get(entriesRef);
-    const current = snap.val() || {};
-    const dup = Object.values(current).some(e=>e.phone===form.phone&&e.status!=="취소");
-    if(dup){
-      errors={phone:"이미 신청하신 연락처입니다."};
-      saving=false; render(); return;
-    }
+    const slotKey  = form.slot.replace(":","");
+    const max      = slotMax(form.slot);
+    const phone    = form.phone;
+    const newEntry = {
+      name: form.name.trim(), phone,
+      gender: form.gender||"미입력", birth: form.birth||"미입력",
+      slot: form.slot, status:"예약",
+      createdAt: new Date().toLocaleString("ko-KR")
+    };
 
-    /* ── 2단계: 슬롯 인원을 Transaction으로 원자적 처리 ── */
-    const slotKey = form.slot.replace(":","");
-    const slotCountRef = ref(db, "slotCounts/" + slotKey);
-    const maxCount = slotMax(form.slot);
+    let txError = null;
+    let savedEntry = null;
 
-    /* ── Transaction: 정원 카운터 원자적 증가 ── */
-    const txResult = await runTransaction(slotCountRef, (currentCount)=>{
-      const cnt = currentCount || 0;
-      if(cnt >= maxCount) return; // 정원 초과 → 중단
-      return cnt + 1;
-    });
+    /* ══ 핵심: slots/{slotKey} 에 Transaction ══
+       읽기 → 중복·정원 검사 → 신청 데이터 추가 를 원자적으로 처리.
+       Firebase는 이 함수를 충돌 없을 때까지 재시도하므로
+       동시에 N명이 눌러도 정원 초과가 불가능. */
+    const txResult = await runTransaction(
+      ref(db, "slots/" + slotKey),
+      (slotData) => {
+        const data    = slotData || { count: 0, entries: {} };
+        const current = data.entries || {};
+
+        /* 중복 체크 */
+        const dup = Object.values(current).some(
+          e => e.phone === phone && e.status !== "취소"
+        );
+        if(dup){ txError = "dup"; return; }
+
+        /* 정원 체크 */
+        const active = Object.values(current).filter(
+          e => e.status !== "취소"
+        ).length;
+        if(active >= max){ txError = "full"; return; }
+
+        /* 통과 → 데이터 추가 */
+        const fbKey = "e" + Date.now() + Math.random().toString(36).slice(2,7);
+        savedEntry  = { ...newEntry, fbKey };
+        return {
+          count:   active + 1,
+          entries: { ...current, [fbKey]: newEntry }
+        };
+      }
+    );
 
     if(!txResult.committed){
-      errors={slot:"방금 해당 시간대 정원이 마감되었습니다. 다른 시간을 선택해 주세요."};
+      if(txError === "dup")  errors = { phone: "이미 신청하신 연락처입니다." };
+      else if(txError === "full") errors = { slot: "방금 정원이 마감되었습니다. 다른 시간을 선택해 주세요." };
+      else errors = { submit: "저장 중 오류가 발생했습니다. 다시 시도해 주세요." };
       saving=false; render(); return;
     }
 
-    /* ── Transaction 성공 후 entries 중복 재확인 (극단적 동시성 방어) ── */
-    const snapAfter = await get(entriesRef);
-    const currentAfter = snapAfter.val() || {};
-    const dupAfter = Object.values(currentAfter).some(e=>e.phone===form.phone&&e.status!=="취소");
-    if(dupAfter){
-      // 카운터 롤백
-      await runTransaction(slotCountRef, cnt => Math.max(0,(cnt||0)-1));
-      errors={phone:"이미 신청하신 연락처입니다."};
-      saving=false; render(); return;
-    }
-
-    /* ── 신청 데이터 저장 ── */
-    const entry={
-      name:form.name.trim(), phone:form.phone,
-      gender:form.gender||"미입력", birth:form.birth||"미입력",
-      slot:form.slot, status:"예약",
-      createdAt:new Date().toLocaleString("ko-KR")
-    };
-    await push(entriesRef, entry);
-    submitted=entry; view="success";
+    submitted = savedEntry || newEntry;
+    view = "success";
 
   }catch(err){
     errors={submit:"저장 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."};
@@ -813,27 +826,24 @@ async function handleSubmit(){
 if(CONFIGURED){
   const app = initializeApp(firebaseConfig);
   db = getDatabase(app);
-  entriesRef = ref(db,"entries");
-  onValue(entriesRef, snapshot=>{
-    entries = snapshot.val() || {};
+  slotsRef  = ref(db, "slots");
+  entriesRef = ref(db, "entries"); // 관리자 호환용 (레거시 entries도 유지)
+
+  /* slots 실시간 리스너 — 모든 슬롯 데이터의 단일 진실 소스 */
+  onValue(slotsRef, snapshot=>{
+    const slotsData = snapshot.val() || {};
+    slotsCache = {};
+    entries    = {};
+
+    Object.entries(slotsData).forEach(([key, slotObj])=>{
+      slotsCache[key] = { count: slotObj.count || 0 };
+      const slotEntries = slotObj.entries || {};
+      Object.entries(slotEntries).forEach(([fbKey, e])=>{
+        entries[fbKey] = e; // 관리자 화면용 통합 entries
+      });
+    });
     render();
   });
-
-  /* slotCounts 실시간 리스너 — Transaction 카운터를 슬롯 잔여 표시에 반영 */
-  const slotCountsRef = ref(db, "slotCounts");
-  let slotCountsCache = {};
-  onValue(slotCountsRef, snapshot=>{
-    slotCountsCache = snapshot.val() || {};
-    render();
-  });
-
-  /* slotCount 함수: Transaction 카운터 우선, 없으면 entries 기반 */
-  const _origSlotCount = slotCount;
-  slotCount = function(s){
-    const key = s.replace(":","");
-    if(slotCountsCache[key] !== undefined) return slotCountsCache[key];
-    return _origSlotCount(s);
-  };
 } else {
   render();
 }
