@@ -211,7 +211,6 @@ const firebaseConfig = {
   appId:             "1:955693703369:web:7d110be6d3dfa78b6b6d18",
   measurementId:     "G-SZ61VT73SS"
 };
-
 /* ───────────────────────────────────────────── */
 
 const CONFIGURED = !firebaseConfig.apiKey.startsWith("YOUR");
@@ -596,14 +595,38 @@ function bindEvents(){
     $("a-slot").onchange   = e=>{ filter.slot=e.target.value; render(); };
     $("a-status").onchange = e=>{ filter.status=e.target.value; render(); };
     document.querySelectorAll(".status-sel").forEach(s=>{
-      s.onchange = ()=>{
-        update(ref(db,`entries/${s.dataset.key}`),{status:s.value});
+      s.onchange = async ()=>{
+        const key = s.dataset.key;
+        const entry = entries[key];
+        const newStatus = s.value;
+        const oldStatus = entry.status;
+
+        await update(ref(db,`entries/${key}`),{status:newStatus});
+
+        const slotKey = entry.slot.replace(":","");
+        const slotRef = ref(db,"slotCounts/"+slotKey);
+
+        // 취소 아닌 상태 → 취소: 카운터 -1
+        if(oldStatus !== "취소" && newStatus === "취소"){
+          await runTransaction(slotRef, cnt => Math.max(0,(cnt||0)-1));
+        }
+        // 취소 → 취소 아닌 상태(복구): 카운터 +1
+        if(oldStatus === "취소" && newStatus !== "취소"){
+          await runTransaction(slotRef, cnt => (cnt||0)+1);
+        }
       };
     });
     document.querySelectorAll(".del-btn").forEach(b=>{
-      b.onclick = ()=>{
+      b.onclick = async ()=>{
         if(!confirm("삭제하시겠습니까?")) return;
-        remove(ref(db,`entries/${b.dataset.key}`));
+        const key = b.dataset.key;
+        const entry = entries[key];
+        await remove(ref(db,`entries/${key}`));
+        // 취소가 아닌 신청 삭제 시 슬롯 카운터 -1
+        if(entry && entry.status !== "취소"){
+          const slotKey = entry.slot.replace(":","");
+          await runTransaction(ref(db,"slotCounts/"+slotKey), cnt => Math.max(0,(cnt||0)-1));
+        }
       };
     });
 
@@ -743,24 +766,34 @@ async function handleSubmit(){
     }
 
     /* ── 2단계: 슬롯 인원을 Transaction으로 원자적 처리 ── */
-    const slotCountRef = ref(db, "slotCounts/" + form.slot.replace(":",""));
+    const slotKey = form.slot.replace(":","");
+    const slotCountRef = ref(db, "slotCounts/" + slotKey);
     const maxCount = slotMax(form.slot);
 
+    /* ── Transaction: 정원 카운터 원자적 증가 ── */
     const txResult = await runTransaction(slotCountRef, (currentCount)=>{
       const cnt = currentCount || 0;
-      if(cnt >= maxCount){
-        return; // undefined 반환 → 트랜잭션 중단 (정원 초과)
-      }
-      return cnt + 1; // 정원 미만 → 1 증가
+      if(cnt >= maxCount) return; // 정원 초과 → 중단
+      return cnt + 1;
     });
 
     if(!txResult.committed){
-      /* 정원 초과 — 다른 사용자가 동시에 신청해서 마감됨 */
       errors={slot:"방금 해당 시간대 정원이 마감되었습니다. 다른 시간을 선택해 주세요."};
       saving=false; render(); return;
     }
 
-    /* ── 3단계: Transaction 성공 시에만 신청 데이터 저장 ── */
+    /* ── Transaction 성공 후 entries 중복 재확인 (극단적 동시성 방어) ── */
+    const snapAfter = await get(entriesRef);
+    const currentAfter = snapAfter.val() || {};
+    const dupAfter = Object.values(currentAfter).some(e=>e.phone===form.phone&&e.status!=="취소");
+    if(dupAfter){
+      // 카운터 롤백
+      await runTransaction(slotCountRef, cnt => Math.max(0,(cnt||0)-1));
+      errors={phone:"이미 신청하신 연락처입니다."};
+      saving=false; render(); return;
+    }
+
+    /* ── 신청 데이터 저장 ── */
     const entry={
       name:form.name.trim(), phone:form.phone,
       gender:form.gender||"미입력", birth:form.birth||"미입력",
@@ -786,24 +819,21 @@ if(CONFIGURED){
     render();
   });
 
-  /* slotCounts 실시간 반영 — Transaction 결과를 UI에 즉시 동기화 */
+  /* slotCounts 실시간 리스너 — Transaction 카운터를 슬롯 잔여 표시에 반영 */
   const slotCountsRef = ref(db, "slotCounts");
+  let slotCountsCache = {};
   onValue(slotCountsRef, snapshot=>{
-    const counts = snapshot.val() || {};
-    /* entries 기반 카운트를 slotCounts로 보정 */
-    ALL_SLOTS.forEach(s=>{
-      const key = s.replace(":","");
-      if(counts[key] !== undefined){
-        /* DB의 Transaction 카운터를 우선 신뢰 */
-        const fromEntries = Object.values(entries).filter(e=>e.slot===s&&e.status!=="취소").length;
-        if(counts[key] > fromEntries){
-          /* 동시 신청으로 slotCounts가 앞서간 경우 UI를 즉시 마감 처리 */
-          entries["__lock_"+key] = {slot:s, status:"예약", phone:"__lock__"};
-        }
-      }
-    });
+    slotCountsCache = snapshot.val() || {};
     render();
   });
+
+  /* slotCount 함수: Transaction 카운터 우선, 없으면 entries 기반 */
+  const _origSlotCount = slotCount;
+  slotCount = function(s){
+    const key = s.replace(":","");
+    if(slotCountsCache[key] !== undefined) return slotCountsCache[key];
+    return _origSlotCount(s);
+  };
 } else {
   render();
 }
