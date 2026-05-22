@@ -660,9 +660,53 @@ async function sendToGsheet(){
 }
 
 function showLoginModal(){
-  view="admin"; render();
-  const modal = document.getElementById("login-modal");
-  if(modal){ modal.style.display="flex"; }
+  // view는 건드리지 않고 모달만 띄움 (폼 화면 유지)
+  // 관리자 HTML 안에 모달이 포함돼 있으므로 임시로 삽입
+  let modal = document.getElementById("login-modal-overlay");
+  if(!modal){
+    modal = document.createElement("div");
+    modal.id = "login-modal-overlay";
+    modal.style.cssText = "display:flex;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;align-items:center;justify-content:center;";
+    modal.innerHTML = `
+      <div style="background:#fff;border-radius:14px;padding:2rem 1.75rem;width:300px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,.3);">
+        <div style="font-size:22px;margin-bottom:8px;">🔐</div>
+        <div style="font-size:16px;font-weight:700;margin-bottom:4px;">관리자 로그인</div>
+        <div style="font-size:13px;color:#888;margin-bottom:1rem;">비밀번호를 입력해 주세요</div>
+        <input id="overlay-pw" type="password" placeholder="비밀번호"
+          style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:15px;margin-bottom:8px;font-family:inherit;outline:none;"/>
+        <div id="overlay-err" style="font-size:12px;color:#c0392b;margin-bottom:8px;display:none;"></div>
+        <button id="overlay-login"
+          style="width:100%;padding:11px;background:#c0392b;color:#fff;border:none;border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px;">
+          로그인
+        </button>
+        <button id="overlay-cancel"
+          style="width:100%;padding:9px;background:#f5f5f5;border:none;border-radius:9px;font-size:13px;cursor:pointer;color:#888;font-family:inherit;">
+          취소
+        </button>
+      </div>`;
+    document.body.appendChild(modal);
+  }
+  modal.style.display = "flex";
+  const pwInput = document.getElementById("overlay-pw");
+  const errEl   = document.getElementById("overlay-err");
+  pwInput.value = ""; errEl.style.display = "none";
+  setTimeout(()=>pwInput.focus(), 50);
+
+  function tryLogin(){
+    if(pwInput.value === ADMIN_PW){
+      modal.style.display = "none";
+      view = "admin"; render();
+    } else {
+      errEl.textContent = "비밀번호가 올바르지 않습니다.";
+      errEl.style.display = "block";
+      pwInput.value = ""; pwInput.focus();
+    }
+  }
+
+  document.getElementById("overlay-login").onclick  = tryLogin;
+  document.getElementById("overlay-cancel").onclick = ()=>{ modal.style.display="none"; };
+  document.getElementById("overlay-pw").onkeydown   = e=>{ if(e.key==="Enter") tryLogin(); };
+  modal.onclick = e=>{ if(e.target===modal) modal.style.display="none"; };
 }
 
 function doModalLogin(){
