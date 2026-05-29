@@ -427,8 +427,7 @@ function renderAdmin(){
       <td>
         <select class="slot-change-sel" data-key="${key}"
           style="border:1px solid #ddd;border-radius:6px;padding:3px 6px;font-size:12px;cursor:pointer;font-family:monospace;font-weight:600;color:#c0392b;background:#fff8f7;">
-          ${ALL_SLOTS.map(s=>`<option${e.slot===s?" selected":""}${isFull(s)&&e.slot!==s?" disabled":""}>
-            ${s}${isFull(s)&&e.slot!==s?" (마감)":""}</option>`).join("")}
+          ${SLOTS.map(s=>`<option${e.slot===s?" selected":""}${isFull(s)&&e.slot!==s?" disabled":""}>${s}${isFull(s)&&e.slot!==s?" (마감)":""}</option>`).join("")}
         </select>
       </td>
       <td style="font-size:12px;color:#aaa;">${e.createdAt||""}</td>
