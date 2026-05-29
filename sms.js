@@ -6,7 +6,7 @@ const API_KEY    = process.env.SOLAPI_API_KEY;
 const API_SECRET = process.env.SOLAPI_API_SECRET;
 const SENDER     = process.env.SOLAPI_SENDER;
 const DB_URL     = process.env.FIREBASE_DB_URL;
-const EVENT_DATE = process.env.EVENT_DATE || '2026-05-31';
+const EVENT_DATE = process.env.EVENT_DATE || '2026-05-31'; // 행사 날짜 (YYYY-MM-DD)
 
 /* ── 테스트 모드 ── */
 const TEST_MODE  = process.env.TEST_MODE === 'true';
@@ -20,6 +20,7 @@ if (TEST_MODE) {
   console.log('========================================\n');
 }
 
+/* ── 솔라피 인증 헤더 생성 ── */
 function getSolapiAuth() {
   const date = new Date().toISOString();
   const salt = Math.random().toString(36).substring(2, 22);
@@ -29,21 +30,47 @@ function getSolapiAuth() {
   return `HMAC-SHA256 apiKey=${API_KEY}, date=${date}, salt=${salt}, signature=${sig}`;
 }
 
+/* ── SMS 발송 함수 ── */
 async function sendSMS(to, name, slotTime) {
+  // 테스트 모드: 수신번호를 테스트 번호로 교체
   const receiver = TEST_MODE ? TEST_PHONE : to;
+
+  // SMS 90바이트 제한 (한글 2바이트)
+  // 테스트 모드와 실제 모드 문자 분리
   let text;
   if (TEST_MODE) {
-    text = `[드림교회]헌혈알림\n${name}(${slotTime}) 도착10분전\n백영고운동장 헌혈차량앞\n※신분증지참 [TEST:${to}]`;
+    text =
+      `[드림교회]헌혈알림\n` +
+      `${name}(${slotTime}) 도착10분전\n` +
+      `백영고운동장 헌혈차량앞\n` +
+      `※신분증지참 [TEST:${to}]`;
   } else {
-    text = `[드림교회]헌혈알림\n${name}님(${slotTime}) 도착10분전\n백영고운동장 헌혈차량앞\n※신분증필수지참`;
+    text =
+      `[드림교회]헌혈알림\n` +
+      `${name}님(${slotTime}) 도착10분전\n` +
+      `백영고운동장 헌혈차량앞\n` +
+      `※신분증필수지참`;
   }
+
   try {
     const res = await axios.post(
       'https://api.solapi.com/messages/v4/send',
-      { message: { to: receiver.replace(/-/g,''), from: SENDER.replace(/-/g,''), text, type:'SMS' } },
-      { headers: { Authorization: getSolapiAuth(), 'Content-Type':'application/json' } }
+      {
+        message: {
+          to:   receiver.replace(/-/g, ''),
+          from: SENDER.replace(/-/g, ''),
+          text: text,
+          type: 'SMS',
+        },
+      },
+      {
+        headers: {
+          Authorization: getSolapiAuth(),
+          'Content-Type': 'application/json',
+        },
+      }
     );
-    console.log(`  ✅ 발송 성공: ${name} (${to})`);
+    console.log(`  ✅ 발송 성공: ${name} (${to}) → 슬롯 ${slotTime}`);
     return res.data;
   } catch (err) {
     console.error(`  ❌ 발송 실패 (${to}):`, err.response?.data || err.message);
@@ -51,28 +78,40 @@ async function sendSMS(to, name, slotTime) {
   }
 }
 
+/* ── Firebase REST API로 슬롯 데이터 읽기 ── */
 async function getSlots() {
   try {
     console.log(`Firebase URL: ${DB_URL}`);
     const res = await axios.get(`${DB_URL}/slots.json`);
     const data = res.data || {};
-    console.log(`Firebase 읽기 성공: 슬롯 ${Object.keys(data).length}개`);
+    const slotCount = Object.keys(data).length;
+    console.log(`Firebase 읽기 성공: 슬롯 ${slotCount}개 확인`);
+    if (slotCount === 0) {
+      console.log('⚠️  슬롯 데이터가 비어있습니다. Firebase URL 또는 데이터 경로를 확인하세요.');
+    }
     return data;
   } catch (err) {
     console.error('❌ Firebase 읽기 실패:', err.message);
+    console.error('   DB_URL:', DB_URL);
     console.error('   상태코드:', err.response?.status);
+    console.error('   응답:', JSON.stringify(err.response?.data));
     return {};
   }
 }
 
+/* ── Firebase smsSent 플래그 업데이트 ── */
 async function markSMSSent(slotKey, entryKey) {
   try {
-    await axios.patch(`${DB_URL}/slots/${slotKey}/entries/${entryKey}.json`, { smsSent: true });
+    await axios.patch(
+      `${DB_URL}/slots/${slotKey}/entries/${entryKey}.json`,
+      { smsSent: true }
+    );
   } catch (err) {
-    console.error(`smsSent 업데이트 실패:`, err.message);
+    console.error(`smsSent 업데이트 실패 (${entryKey}):`, err.message);
   }
 }
 
+/* ── 메인 실행 ── */
 async function main() {
   const now   = new Date();
   const slots = await getSlots();
@@ -82,39 +121,74 @@ async function main() {
 
   for (const [slotKey, slotData] of Object.entries(slots)) {
     const entries = slotData.entries || {};
+
     for (const [entryKey, entry] of Object.entries(entries)) {
-      if (entry.smsSent === true || entry.smsSent === 'true') continue;
-      if (entry.status === '취소') continue;
+
+      /* 이미 발송했거나 취소된 신청 건너뜀 */
+      if (entry.smsSent === true || entry.smsSent === "true") continue;
+      if (entry.status === '취소')  continue;
       if (!entry.phone || !entry.slot) continue;
 
+      /* 테스트 모드: name이 "테스트" 또는 "test"인 데이터만 처리 */
       if (TEST_MODE) {
         const n = (entry.name || '').toLowerCase();
         if (n !== '테스트' && n !== 'test') continue;
       }
 
+      /* 예약 시간 파싱 — "09:00" 형식 */
       const [hh, mm] = entry.slot.split(':').map(Number);
+
+      /*
+       * 테스트 모드: 오늘 날짜 기준으로 예약 시간 계산
+       * 실제 모드: 행사 날짜(EVENT_DATE) 기준
+       */
       const baseDate = TEST_MODE
         ? new Date(now.getFullYear(), now.getMonth(), now.getDate())
         : new Date(`${EVENT_DATE}T00:00:00+09:00`);
+
       baseDate.setHours(hh, mm, 0, 0);
 
+      /*
+       * 발송 타이밍 계산:
+       * 헌혈 시간 = slotTime
+       * 도착 시간 = slotTime - 10분
+       * 발송 시간 = 도착 시간 - 10분 = slotTime - 20분
+       *
+       * 예) 헌혈 09:00 → 도착 08:50 → 발송 08:40
+       */
       const sendTime = new Date(baseDate.getTime() - 20 * 60 * 1000);
       const diffMin  = (sendTime.getTime() - now.getTime()) / 60000;
 
-      console.log(`[${entry.name}] 슬롯: ${entry.slot} | 발송예정: ${sendTime.toLocaleTimeString('ko-KR')} | 남은시간: ${diffMin.toFixed(1)}분`);
+      console.log(
+        `[${entry.name}] 슬롯: ${entry.slot} | ` +
+        `발송 예정: ${sendTime.toLocaleTimeString('ko-KR')} | ` +
+        `남은 시간: ${diffMin.toFixed(1)}분`
+      );
 
+      /*
+       * 발송 조건:
+       * diffMin이 -5 ~ +10 범위로 넓혀서 타이밍 놓침 방지
+       */
       if (diffMin >= -5 && diffMin <= 10) {
         console.log(`  → 발송 조건 충족!`);
         const result = await sendSMS(entry.phone, entry.name, entry.slot);
+
         if (result) {
-          if (!TEST_MODE) await markSMSSent(slotKey, entryKey);
-          else console.log(`  [테스트] smsSent 생략`);
+          // 테스트 모드에서는 smsSent를 true로 바꾸지 않음 (재발송 가능하도록)
+          if (!TEST_MODE) {
+            await markSMSSent(slotKey, entryKey);
+          } else {
+            console.log(`  [테스트] smsSent 업데이트 생략 (재테스트 가능)`);
+          }
           sentCount++;
         }
       }
     }
   }
-  console.log(`\n완료: 총 ${sentCount}건 발송${TEST_MODE ? ' (테스트 모드)' : ''}`);
+
+  console.log(`\n========================================`);
+  console.log(`완료: 총 ${sentCount}건 발송${TEST_MODE ? ' (테스트 모드)' : ''}`);
+  console.log(`========================================`);
 }
 
 main().catch(console.error);
