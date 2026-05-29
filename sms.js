@@ -105,7 +105,7 @@ async function main() {
     for (const [entryKey, entry] of Object.entries(entries)) {
 
       /* 이미 발송했거나 취소된 신청 건너뜀 */
-      if (entry.smsSent)           continue;
+      if (entry.smsSent === true || entry.smsSent === "true") continue;
       if (entry.status === '취소')  continue;
       if (!entry.phone || !entry.slot) continue;
 
@@ -141,10 +141,9 @@ async function main() {
 
       /*
        * 발송 조건:
-       * diffMin이 -2 ~ +5 범위 (스케줄러 5분 간격 기준, ±여유 포함)
-       * 즉 발송 예정 시각 ±5분 이내에 실행될 경우 발송
+       * diffMin이 -5 ~ +10 범위로 넓혀서 타이밍 놓침 방지
        */
-      if (diffMin >= -2 && diffMin <= 5) {
+      if (diffMin >= -5 && diffMin <= 10) {
         console.log(`  → 발송 조건 충족!`);
         const result = await sendSMS(entry.phone, entry.name, entry.slot);
 
