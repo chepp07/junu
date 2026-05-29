@@ -35,12 +35,22 @@ async function sendSMS(to, name, slotTime) {
   // 테스트 모드: 수신번호를 테스트 번호로 교체
   const receiver = TEST_MODE ? TEST_PHONE : to;
 
-  const text =
-    `[평촌드림교회] 헌혈 예약 알림\n` +
-    `${name}님, 헌혈 예약 시간(${slotTime}) 10분 전 도착 부탁드립니다.\n` +
-    `지금 백영고 운동장 헌혈 차량 앞으로 이동해 주세요.\n` +
-    `※ 신분증 필수 지참` +
-    (TEST_MODE ? `\n[테스트 발송 - 원래 수신자: ${to} / ${name}]` : '');
+  // SMS 90바이트 제한 (한글 2바이트)
+  // 테스트 모드와 실제 모드 문자 분리
+  let text;
+  if (TEST_MODE) {
+    text =
+      `[드림교회]헌혈알림\n` +
+      `${name}(${slotTime}) 도착10분전\n` +
+      `백영고운동장 헌혈차량앞\n` +
+      `※신분증지참 [TEST:${to}]`;
+  } else {
+    text =
+      `[드림교회]헌혈알림\n` +
+      `${name}님(${slotTime}) 도착10분전\n` +
+      `백영고운동장 헌혈차량앞\n` +
+      `※신분증필수지참`;
+  }
 
   try {
     const res = await axios.post(
@@ -108,6 +118,12 @@ async function main() {
       if (entry.smsSent === true || entry.smsSent === "true") continue;
       if (entry.status === '취소')  continue;
       if (!entry.phone || !entry.slot) continue;
+
+      /* 테스트 모드: name이 "테스트" 또는 "test"인 데이터만 처리 */
+      if (TEST_MODE) {
+        const n = (entry.name || '').toLowerCase();
+        if (n !== '테스트' && n !== 'test') continue;
+      }
 
       /* 예약 시간 파싱 — "09:00" 형식 */
       const [hh, mm] = entry.slot.split(':').map(Number);
