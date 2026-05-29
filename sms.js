@@ -37,20 +37,19 @@ async function sendSMS(to, name, slotTime) {
 
   // SMS 90바이트 제한 (한글 2바이트)
   // 테스트 모드와 실제 모드 문자 분리
-  let text;
-  if (TEST_MODE) {
-    text =
-      `[드림교회]헌혈알림\n` +
-      `${name}(${slotTime}) 도착10분전\n` +
-      `백영고운동장 헌혈차량앞\n` +
-      `※신분증지참 [TEST:${to}]`;
-  } else {
-    text =
-      `[드림교회]헌혈알림\n` +
-      `${name}님(${slotTime}) 도착10분전\n` +
-      `백영고운동장 헌혈차량앞\n` +
-      `※신분증필수지참`;
-  }
+  // 도착 시간 = 헌혈 시간 - 10분
+  const [sh, sm] = slotTime.split(':').map(Number);
+  const arrivalDate = new Date();
+  arrivalDate.setHours(sh, sm - 10, 0, 0);
+  const arrivalTime = `${String(arrivalDate.getHours()).padStart(2,'0')}:${String(arrivalDate.getMinutes()).padStart(2,'0')}`;
+
+  const text =
+    `[평촌드림교회] 헌혈 예약 알림\n\n` +
+    `${name}님, 헌혈 예약 시간은 ${slotTime}입니다.\n` +
+    `${arrivalTime}까지 백영고 운동장 헌혈 차량 앞으로\n` +
+    `도착해 주시기 바랍니다.\n\n` +
+    `※ 신분증 필수 지참\n` +
+    `※ 예약 취소 시 관리자에게 연락 바랍니다.`;
 
   try {
     const res = await axios.post(
@@ -60,7 +59,7 @@ async function sendSMS(to, name, slotTime) {
           to:   receiver.replace(/-/g, ''),
           from: SENDER.replace(/-/g, ''),
           text: text,
-          type: 'SMS',
+          type: 'LMS',
         },
       },
       {
