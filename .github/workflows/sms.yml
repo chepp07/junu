@@ -1,0 +1,46 @@
+name: 헌혈 예약 SMS 알림
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'   # 매 5분마다 자동 실행
+  workflow_dispatch:          # 수동 테스트 실행 버튼
+    inputs:
+      test_mode:
+        description: '테스트 모드 (true = 테스트 번호로만 발송)'
+        required: true
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      test_phone:
+        description: '테스트 수신 번호 (테스트 모드일 때만 사용, 예: 01012345678)'
+        required: false
+        default: ''
+
+jobs:
+  send-sms:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Node.js 설정
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: 패키지 설치
+        run: npm install axios
+
+      - name: SMS 발송 스크립트 실행
+        env:
+          SOLAPI_API_KEY:    ${{ secrets.SOLAPI_API_KEY }}
+          SOLAPI_API_SECRET: ${{ secrets.SOLAPI_API_SECRET }}
+          SOLAPI_SENDER:     ${{ secrets.SOLAPI_SENDER }}
+          FIREBASE_DB_URL:   ${{ secrets.FIREBASE_DB_URL }}
+          EVENT_DATE:        '2026-05-31'
+          # 수동 실행 시 입력값 우선 / 자동 실행 시 false
+          TEST_MODE:  ${{ github.event_name == 'workflow_dispatch' && inputs.test_mode || 'false' }}
+          TEST_PHONE: ${{ github.event_name == 'workflow_dispatch' && inputs.test_phone || secrets.TEST_PHONE }}
+        run: node sms.js
