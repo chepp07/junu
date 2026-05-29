@@ -211,6 +211,7 @@ const firebaseConfig = {
   appId: "1:955693703369:web:7d110be6d3dfa78b6b6d18",
   measurementId: "G-SZ61VT73SS"
 };
+
 /* ───────────────────────────────────────────── */
 
 const CONFIGURED = !firebaseConfig.apiKey.startsWith("YOUR");
@@ -423,7 +424,13 @@ function renderAdmin(){
       <td style="color:#666;">${e.phone}</td>
       <td style="color:#666;">${e.gender||"-"}</td>
       <td style="color:#666;">${e.birth||"-"}</td>
-      <td style="font-family:monospace;font-weight:600;">${e.slot}</td>
+      <td>
+        <select class="slot-change-sel" data-key="${key}"
+          style="border:1px solid #ddd;border-radius:6px;padding:3px 6px;font-size:12px;cursor:pointer;font-family:monospace;font-weight:600;color:#c0392b;background:#fff8f7;">
+          ${ALL_SLOTS.map(s=>`<option${e.slot===s?" selected":""}${isFull(s)&&e.slot!==s?" disabled":""}>
+            ${s}${isFull(s)&&e.slot!==s?" (마감)":""}</option>`).join("")}
+        </select>
+      </td>
       <td style="font-size:12px;color:#aaa;">${e.createdAt||""}</td>
       <td>
         <select class="status-sel" data-key="${key}"
@@ -615,6 +622,68 @@ function bindEvents(){
           const active = Object.values(ents).filter(e=>e.status!=="취소").length;
           return { ...slotData, entries: ents, count: active };
         });
+      };
+    });
+
+    /* ── 예약 시간 변경 핸들러 ── */
+    document.querySelectorAll(".slot-change-sel").forEach(s=>{
+      s.onchange = async ()=>{
+        const fbKey   = s.dataset.key;
+        const entry   = entries[fbKey];
+        const newSlot = s.value;
+        if(!entry || entry.slot === newSlot) return;
+
+        const oldSlotKey = entry.slot.replace(":","");
+        const newSlotKey = newSlot.replace(":","");
+        const maxNew     = slotMax(newSlot);
+
+        // 변경 전 정원 확인
+        const newCount = Object.values(entries).filter(e=>e.slot===newSlot&&e.status!=="취소").length;
+        if(newCount >= maxNew){
+          alert(`${newSlot} 시간대는 정원(${maxNew}명)이 마감되었습니다.`);
+          s.value = entry.slot; // 원래 값으로 되돌리기
+          return;
+        }
+
+        if(!confirm(`${entry.name}님의 예약 시간을 ${entry.slot} → ${newSlot}으로 변경하시겠습니까?`)) {
+          s.value = entry.slot;
+          return;
+        }
+
+        try {
+          // 기존 슬롯에서 제거
+          await runTransaction(ref(db,"slots/"+oldSlotKey), (slotData)=>{
+            if(!slotData) return slotData;
+            const ents = { ...(slotData.entries||{}) };
+            if(ents[fbKey]) {
+              ents[fbKey] = { ...ents[fbKey], slot: newSlot, smsSent: false };
+            }
+            const active = Object.values(ents).filter(e=>e.status!=="취소").length;
+            return { ...slotData, entries: ents, count: active };
+          });
+
+          // 새 슬롯에 추가
+          await runTransaction(ref(db,"slots/"+newSlotKey), (slotData)=>{
+            const data  = slotData || { count:0, entries:{} };
+            const ents  = { ...(data.entries||{}) };
+            ents[fbKey] = { ...entry, slot: newSlot, smsSent: false };
+            const active = Object.values(ents).filter(e=>e.status!=="취소").length;
+            return { ...data, entries: ents, count: active };
+          });
+
+          // 기존 슬롯에서 entry 삭제
+          await runTransaction(ref(db,"slots/"+oldSlotKey), (slotData)=>{
+            if(!slotData) return slotData;
+            const ents = { ...(slotData.entries||{}) };
+            delete ents[fbKey];
+            const active = Object.values(ents).filter(e=>e.status!=="취소").length;
+            return { ...slotData, entries: ents, count: active };
+          });
+
+        } catch(err) {
+          alert("시간 변경 중 오류가 발생했습니다. 다시 시도해 주세요.");
+          console.error(err);
+        }
       };
     });
     document.querySelectorAll(".del-btn").forEach(b=>{
